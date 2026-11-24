@@ -4,160 +4,87 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>OSM Change Hunt</title>
-<meta name="description" content="A satellite-tasking arcade game built on the InGARSS 2026 paper on OpenStreetMap temporal differencing as a change prior.">
+<meta name="description" content="A one-minute satellite game built on the InGARSS 2026 paper on OpenStreetMap edits as a change prior.">
 <meta name="theme-color" content="#070b1a">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Chakra+Petch:wght@400;600;700&display=swap">
 <style>
-/* One deliberate look: a night-shift satellite ops arcade cabinet. Dark only.
-   Layout: HUD bar → map (the playfield) → controls; overlays for title, briefing, debrief. */
+/* One deliberate look: a night-shift satellite arcade. Dark only. HUD → map → one button. */
 :root {
   color-scheme: dark;
-  --bg: #070b1a;        /* deep orbit */
-  --panel: #0e1530;
-  --tile: #142047;
-  --tile2: #17264f;
-  --tile3: #1a2b57;
-  --line: #2a3a74;
-  --ink: #e9edff;
-  --muted: #8f9bd0;
-  --cyan: #3ee8ff;      /* your satellite */
-  --magenta: #ff3fa4;   /* the rival: AUTO-PRIOR */
-  --gold: #ffd23f;      /* score */
-  --hit: #3dff8b;
-  --miss: #ff5a3d;
+  --bg: #070b1a; --panel: #0e1530; --tile: #142047; --tile2: #17264f; --line: #2a3a74;
+  --ink: #e9edff; --muted: #8f9bd0;
+  --cyan: #3ee8ff; --magenta: #ff3fa4; --gold: #ffd23f; --hit: #3dff8b; --miss: #ff5a3d;
   --add: #3dff8b; --del: #ff5a3d; --mod: #5aa9ff;
-  --ramp1: #fff2a8; --ramp2: #ffb347; --ramp3: #e8590c; --ramp4: #b3120f;
   --f-pixel: "Press Start 2P", "Courier New", monospace;
   --f-body: "Chakra Petch", "Segoe UI", system-ui, sans-serif;
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; background: var(--bg); color: var(--ink); }
-body {
-  font: 16px/1.45 var(--f-body);
-  min-height: 100dvh;
-  padding-left: max(12px, env(safe-area-inset-left, 0px));
-  padding-right: max(12px, env(safe-area-inset-right, 0px));
-  padding-block: max(10px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-bottom, 0px));
-  overflow-x: hidden;
-}
+body { font: 16px/1.45 var(--f-body); min-height: 100dvh; overflow-x: hidden;
+  padding-left: max(12px, env(safe-area-inset-left, 0px)); padding-right: max(12px, env(safe-area-inset-right, 0px));
+  padding-block: max(12px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-bottom, 0px)); }
 #stars { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
-.cab { position: relative; z-index: 1; max-width: 620px; margin: 0 auto; display: grid; gap: 10px; }
+.cab { position: relative; z-index: 1; max-width: 560px; margin: 0 auto; display: grid; gap: 12px; }
 [hidden] { display: none !important; }
 button { font: inherit; color: inherit; cursor: pointer; }
 button:focus-visible, .cell:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
 
-/* ---------- HUD ---------- */
-.hud { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px;
-       font: 10px/1.6 var(--f-pixel); text-transform: uppercase; }
-.hud .lbl { color: var(--muted); display: block; font-size: 8px; }
-.hud .val { color: var(--gold); font-size: 13px; font-variant-numeric: tabular-nums; }
-.hud .mid { text-align: center; }
-.hud .right { text-align: right; }
-.vsbar { display: flex; justify-content: space-between; font: 9px var(--f-pixel); }
-.vsbar .you { color: var(--cyan); } .vsbar .ai { color: var(--magenta); }
-.pass { height: 10px; border: 2px solid var(--line); border-radius: 2px; position: relative; overflow: hidden; }
-.pass i { position: absolute; inset: 0 auto 0 0; width: 100%; background: linear-gradient(90deg, var(--cyan), var(--gold)); transform-origin: left; }
-.pass.low i { background: var(--miss); animation: blink 0.5s steps(2) infinite; }
-.shots { display: flex; gap: 6px; justify-content: center; }
-.shot { width: 22px; height: 22px; }
-.shot svg { width: 100%; height: 100%; }
-.shot.spent { opacity: 0.22; }
+.hud { display: flex; justify-content: space-between; align-items: center; font: 10px/1.6 var(--f-pixel); }
+.hud .you { color: var(--cyan); } .hud .ai { color: var(--magenta); } .hud .mis { color: var(--gold); }
+.hint { margin: 0; text-align: center; font-size: 15px; color: var(--muted); min-height: 2.9em; }
+.hint b { color: var(--gold); }
 
-/* ---------- playfield ---------- */
-.field { position: relative; background: var(--panel); border: 2px solid var(--line); border-radius: 6px; padding: 8px;
-         box-shadow: 0 0 0 4px #0a1026, 0 0 30px rgba(62, 232, 255, 0.12) inset; }
-.field::after { content: ""; position: absolute; inset: 0; pointer-events: none; border-radius: 6px;
-                background: repeating-linear-gradient(0deg, rgba(255,255,255,0.035) 0 1px, transparent 1px 3px); }
-.mapwrap { position: relative; }
+.field { background: var(--panel); border: 2px solid var(--line); border-radius: 6px; padding: 8px;
+         box-shadow: 0 0 0 4px #0a1026, 0 0 30px rgba(62,232,255,0.12) inset; }
 .grid { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 3px; }
 .cell { position: relative; aspect-ratio: 1; border-radius: 3px; border: 1px solid #22336a; padding: 2px; overflow: hidden;
-        display: flex; flex-wrap: wrap; align-content: flex-start; gap: 1px; background: var(--tile); user-select: none; }
-.cell.t2 { background: var(--tile2); } .cell.t3 { background: var(--tile3); }
+        display: flex; flex-wrap: wrap; align-content: center; justify-content: center; gap: 1px; background: var(--tile); user-select: none; }
+.cell.alt { background: var(--tile2); }
 .cell.sel { border-color: var(--cyan); box-shadow: 0 0 0 2px var(--cyan), 0 0 12px rgba(62,232,255,0.6); }
-.cell.sel::before { content: ""; position: absolute; inset: 22%; border: 2px solid var(--cyan); border-radius: 50%; opacity: 0.8; }
+.cell.sel::before { content: ""; position: absolute; inset: 20%; border: 2px solid var(--cyan); border-radius: 50%; }
 .cell.ai::after { content: ""; position: absolute; inset: 1px; border: 3px dashed var(--magenta); border-radius: 2px; pointer-events: none; }
-.cell .heat { position: absolute; inset: 0; opacity: 0.8; pointer-events: none; }
-.cell .mk { position: absolute; inset: 0; display: grid; place-items: center; font: 800 clamp(16px, 5vw, 26px)/1 var(--f-body); pointer-events: none; z-index: 3; text-shadow: 0 0 8px currentColor; }
-.cell .mk.hit { color: var(--hit); } .cell .mk.miss { color: var(--miss); }
-.cell .sc { position: absolute; left: 2px; bottom: 1px; font: 7px var(--f-pixel); color: #fff; z-index: 2; text-shadow: 0 0 3px #000; }
-.cell.scan { animation: scan 520ms ease-out; }
-.b { display: inline-grid; place-items: center; min-width: clamp(10px, 2.9vw, 15px); height: clamp(10px, 2.9vw, 15px); padding: 0 1px; border-radius: 2px;
-     background: #dfe6ff; color: #0b1430; font: 700 clamp(6px, 1.7vw, 8px)/1 var(--f-pixel); position: relative; z-index: 1; }
-.dot { width: clamp(3px, 0.9vw, 5px); height: clamp(3px, 0.9vw, 5px); border-radius: 50%; background: #6f7fb8; margin: 1px; position: relative; z-index: 1; }
-.add { background: var(--add) !important; color: #06210f !important; }
-.del { background: var(--del) !important; color: #2a0700 !important; }
-.mod { background: var(--mod) !important; color: #04142b !important; }
-.sat { position: absolute; top: 0; left: 0; width: 34px; height: 34px; z-index: 4; pointer-events: none; filter: drop-shadow(0 0 6px var(--cyan)); transition: none; }
-.track { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+.cell .mk { position: absolute; inset: 0; display: grid; place-items: center; font: 800 clamp(18px, 5.5vw, 28px)/1 var(--f-body); z-index: 3; text-shadow: 0 0 8px currentColor; }
+.mk.hit { color: var(--hit); } .mk.miss { color: var(--miss); }
+.cell.scan { animation: scan 500ms ease-out; }
+.b { display: inline-grid; place-items: center; min-width: clamp(12px, 3.4vw, 18px); height: clamp(12px, 3.4vw, 18px); padding: 0 1px; border-radius: 2px;
+     font: 700 clamp(7px, 2vw, 9px)/1 var(--f-pixel); position: relative; z-index: 1; }
+.dot { width: clamp(4px, 1.1vw, 6px); height: clamp(4px, 1.1vw, 6px); border-radius: 50%; margin: 1px; position: relative; z-index: 1; }
+.add { background: var(--add); color: #06210f; } .del { background: var(--del); color: #2a0700; } .mod { background: var(--mod); color: #04142b; }
 
-/* ---------- controls ---------- */
-.ctrl { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; }
-.views { display: flex; border: 2px solid var(--line); border-radius: 4px; overflow: hidden; }
-.views button { flex: 1; background: transparent; border: 0; padding: 9px 4px; font: 9px var(--f-pixel); color: var(--muted); }
-.views button[aria-pressed="true"] { background: var(--cyan); color: #04121a; }
-.fire { font: 12px var(--f-pixel); padding: 12px 14px; border-radius: 4px; border: 0; background: var(--miss); color: #fff;
-        box-shadow: 0 4px 0 #8f2412; text-transform: uppercase; }
-.fire:active { transform: translateY(3px); box-shadow: 0 1px 0 #8f2412; }
-.fire:disabled { background: #3a2a40; box-shadow: 0 4px 0 #22172a; color: #8c7f97; cursor: not-allowed; }
-.tip { font-size: 13px; color: var(--muted); margin: 0; text-align: center; }
-.icons { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
-.icons span { display: inline-flex; gap: 4px; align-items: center; }
+.go { font: 13px var(--f-pixel); padding: 15px; border-radius: 4px; border: 0; background: var(--miss); color: #fff; box-shadow: 0 4px 0 #8f2412; text-transform: uppercase; width: 100%; }
+.go:active { transform: translateY(3px); box-shadow: 0 1px 0 #8f2412; }
+.go:disabled { background: #3a2a40; box-shadow: 0 4px 0 #22172a; color: #8c7f97; cursor: not-allowed; }
+.go.next { background: var(--gold); color: #1d1500; box-shadow: 0 4px 0 #a67d00; }
+.key { display: flex; flex-wrap: wrap; gap: 6px 14px; justify-content: center; font-size: 13px; color: var(--muted); }
+.key span { display: inline-flex; gap: 5px; align-items: center; }
+footer { font-size: 12px; color: var(--muted); text-align: center; }
 
-/* ---------- overlays ---------- */
-.ov { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; background: rgba(4, 7, 20, 0.86);
-      padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
-      overflow-y: auto; }
-.box { width: min(560px, 100%); background: var(--panel); border: 3px solid var(--cyan); border-radius: 6px; padding: 20px 18px;
-       box-shadow: 0 0 0 4px #0a1026, 0 0 40px rgba(62,232,255,0.25); display: grid; gap: 14px; text-align: center; }
-.box.ai { border-color: var(--magenta); box-shadow: 0 0 0 4px #0a1026, 0 0 40px rgba(255,63,164,0.25); }
-.logo { font: clamp(22px, 7vw, 38px)/1.25 var(--f-pixel); margin: 0; color: var(--gold);
-        text-shadow: 3px 3px 0 var(--magenta), 6px 6px 0 #2a1450; letter-spacing: 1px; }
-.logo small { display: block; font-size: 0.42em; color: var(--cyan); text-shadow: none; margin-top: 10px; letter-spacing: 2px; }
-.pix { font: 11px/1.7 var(--f-pixel); text-transform: uppercase; margin: 0; }
-.pix.c { color: var(--cyan); } .pix.m { color: var(--magenta); } .pix.g { color: var(--gold); } .pix.mut { color: var(--muted); }
-.box p { margin: 0; }
-.story { text-align: left; font-size: 15px; display: grid; gap: 8px; }
-.story b { color: var(--gold); font-weight: 700; }
-.steps { text-align: left; display: grid; gap: 6px; font-size: 14px; }
-.steps div { display: grid; grid-template-columns: 26px 1fr; gap: 8px; align-items: start; }
-.steps i { font: normal 10px/22px var(--f-pixel); color: #04121a; background: var(--cyan); border-radius: 3px; text-align: center; }
-.start { font: 14px var(--f-pixel); padding: 16px 18px; border: 0; border-radius: 4px; background: var(--gold); color: #1d1500;
+.ov { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; background: rgba(4,7,20,0.88); overflow-y: auto;
+      padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+.box { width: min(480px, 100%); background: var(--panel); border: 3px solid var(--cyan); border-radius: 6px; padding: 22px 18px;
+       box-shadow: 0 0 0 4px #0a1026, 0 0 40px rgba(62,232,255,0.25); display: grid; gap: 16px; text-align: center; }
+.logo { font: clamp(22px, 7vw, 36px)/1.3 var(--f-pixel); margin: 0; color: var(--gold); text-shadow: 3px 3px 0 var(--magenta), 6px 6px 0 #2a1450; }
+.box p { margin: 0; font-size: 16px; }
+.box p b { color: var(--gold); }
+.pix { font: 10px/1.7 var(--f-pixel); text-transform: uppercase; color: var(--cyan); }
+.start { font: 14px var(--f-pixel); padding: 16px 20px; border: 0; border-radius: 4px; background: var(--gold); color: #1d1500;
          box-shadow: 0 5px 0 #a67d00; text-transform: uppercase; justify-self: center; }
 .start:active { transform: translateY(4px); box-shadow: 0 1px 0 #a67d00; }
 .blink { animation: blink 1s steps(2) infinite; }
-.intel { border: 2px dashed var(--line); border-radius: 4px; padding: 10px; text-align: left; font-size: 14px; display: grid; gap: 4px; }
-.intel .pix { font-size: 9px; }
-.tally { display: grid; gap: 6px; text-align: left; font-size: 14px; }
-.tally div { display: flex; justify-content: space-between; gap: 10px; border-bottom: 1px dashed var(--line); padding-bottom: 4px; }
-.tally b { font: 11px var(--f-pixel); color: var(--gold); white-space: nowrap; }
-.duel { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.duel div { border: 2px solid var(--cyan); border-radius: 4px; padding: 8px; display: grid; gap: 6px; }
-.duel div.ai { border-color: var(--magenta); }
-.duel .n { font: 22px var(--f-pixel); }
-.duel .you .n { color: var(--cyan); } .duel .ai .n { color: var(--magenta); }
-.lesson { text-align: left; font-size: 14px; border-left: 4px solid var(--gold); padding-left: 10px; }
-.paper { text-align: left; font-size: 13px; display: grid; gap: 8px; }
-.paper .nums { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; text-align: center; }
-.paper .nums b { display: block; font: 13px var(--f-pixel); color: var(--gold); margin-bottom: 4px; }
-table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
-th, td { padding: 4px; border-bottom: 1px solid var(--line); text-align: right; }
-th:first-child, td:first-child { text-align: left; }
-th { font: 8px var(--f-pixel); color: var(--muted); }
-.row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
-.ghost { font: 10px var(--f-pixel); background: transparent; border: 2px solid var(--line); border-radius: 4px; padding: 10px 12px; color: var(--muted); }
-.credit { font-size: 12px; color: var(--muted); }
-.toast { position: fixed; left: 50%; top: 42%; transform: translate(-50%, -50%); z-index: 9; pointer-events: none;
-         font: clamp(14px, 4.5vw, 22px)/1.4 var(--f-pixel); color: var(--gold); text-shadow: 3px 3px 0 var(--magenta); text-align: center; white-space: nowrap; }
-.toast.show { animation: pop 900ms ease-out both; }
+.big { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.big div { border: 2px solid var(--cyan); border-radius: 4px; padding: 10px 6px; display: grid; gap: 6px; }
+.big div.ai { border-color: var(--magenta); }
+.big .n { font: 26px var(--f-pixel); color: var(--cyan); } .big .ai .n { color: var(--magenta); }
+.big .l { font: 8px var(--f-pixel); color: var(--muted); text-transform: uppercase; }
+.nums { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; font-size: 13px; color: var(--muted); }
+.nums b { display: block; font: 14px var(--f-pixel); color: var(--gold); margin-bottom: 4px; }
+.small { font-size: 13px !important; color: var(--muted); }
 .mute { position: fixed; right: max(10px, env(safe-area-inset-right, 0px)); bottom: max(10px, env(safe-area-inset-bottom, 0px)); z-index: 11;
         font: 9px var(--f-pixel); background: var(--panel); border: 2px solid var(--line); border-radius: 4px; padding: 8px; color: var(--muted); }
-footer { font-size: 12px; color: var(--muted); text-align: center; }
 @keyframes blink { 50% { opacity: 0.25; } }
-@keyframes scan { 0% { box-shadow: inset 0 0 0 0 var(--cyan); filter: brightness(2.2); } 100% { box-shadow: inset 0 0 0 30px transparent; filter: none; } }
-@keyframes pop { 0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); } 20% { opacity: 1; transform: translate(-50%, -50%) scale(1.15); }
-                 70% { opacity: 1; transform: translate(-50%, -50%) scale(1); } 100% { opacity: 0; transform: translate(-50%, -60%) scale(1); } }
-@media (prefers-reduced-motion: reduce) { .blink, .pass.low i, .cell.scan, .toast.show { animation: none; } .toast.show { opacity: 1; } }
+@keyframes scan { 0% { filter: brightness(2.4); } 100% { filter: none; } }
+@media (prefers-reduced-motion: reduce) { .blink, .cell.scan { animation: none; } }
 </style>
 </head>
 <body>
@@ -165,412 +92,185 @@ footer { font-size: 12px; color: var(--muted); text-align: center; }
 
 <div class="cab">
   <div class="hud" aria-live="polite">
-    <div><span class="lbl">Score</span><span class="val" id="score">000000</span></div>
-    <div class="mid"><span class="lbl">Mission</span><span class="val" id="mission">1/5</span></div>
-    <div class="right"><span class="lbl">Hi-score</span><span class="val" id="hi">000000</span></div>
+    <span class="you">YOU <span id="you">0</span></span>
+    <span class="mis">MISSION <span id="mis">1</span>/3</span>
+    <span class="ai">AI <span id="ai">0</span></span>
   </div>
-  <div class="vsbar"><span class="you">YOU <span id="youHits">0</span></span><span class="mut" style="color:var(--muted)" id="sector">SECTOR —</span><span class="ai">AUTO-PRIOR <span id="aiHits">0</span></span></div>
-  <div class="pass" id="pass" aria-label="Time left in the satellite pass"><i id="passBar"></i></div>
-
-  <div class="field">
-    <div class="mapwrap" id="mapwrap">
-      <div class="grid" id="grid" role="grid" aria-label="8 by 8 grid of 10 km tiles"></div>
-      <svg class="track" id="track" aria-hidden="true"></svg>
-      <svg class="sat" id="sat" viewBox="0 0 40 40" aria-hidden="true">
-        <rect x="15" y="14" width="10" height="12" rx="2" fill="#e9edff"/>
-        <rect x="2" y="16" width="11" height="8" fill="#3ee8ff"/><rect x="27" y="16" width="11" height="8" fill="#3ee8ff"/>
-        <line x1="20" y1="26" x2="20" y2="33" stroke="#ffd23f" stroke-width="2"/><circle cx="20" cy="34" r="2.5" fill="#ffd23f"/>
-      </svg>
-    </div>
+  <p class="hint" id="hint"></p>
+  <div class="field"><div class="grid" id="grid" role="grid" aria-label="Map of 64 tiles"></div></div>
+  <button class="go" id="go" disabled>Pick 6 tiles</button>
+  <div class="key">
+    <span><span class="b add">+A</span>new feature</span>
+    <span><span class="b del">−A</span>removed</span>
+    <span><span class="b mod">~N</span>changed</span>
+    <span><span class="dot add"></span>building or road</span>
   </div>
-
-  <div class="shots" id="shots" aria-label="SAR shots left"></div>
-  <div class="ctrl">
-    <div class="views" role="group" aria-label="Intel view">
-      <button id="vT1" aria-pressed="false">OSM T₁</button>
-      <button id="vT2" aria-pressed="false">OSM T₂</button>
-      <button id="vD" aria-pressed="true">DIFF</button>
-    </div>
-    <button class="fire" id="fire" disabled>Fire</button>
-  </div>
-  <p class="tip" id="tip">Tap up to 6 tiles to lock targets, then FIRE before the pass ends.</p>
-  <div class="icons">
-    <span><span class="b">N</span>naval 5</span><span><span class="b">A</span>airfield 4</span><span><span class="b">M</span>military 3</span>
-    <span><span class="b">R</span>radar 3</span><span><span class="b">L</span>logistics 2</span><span><span class="b">P</span>power 1</span>
-    <span><span class="dot" style="display:inline-block"></span>building / road 0.5</span>
-  </div>
-  <footer>Built on “OpenStreetMap Temporal Differencing as a Change Prior for SAR-Based Change Detection”, Mehta, Jeevanand, Deep, Dave &amp; Bhatt, GalaxEye Space · InGARSS 2026, paper 1571316236. All maps are simulated.</footer>
+  <div class="key"><span>N naval · A airfield · R radar · M military · L logistics · P power</span></div>
+  <footer>From the InGARSS 2026 paper 1571316236 by Mehta, Jeevanand, Deep, Dave &amp; Bhatt, GalaxEye Space. Maps are simulated.</footer>
 </div>
 
-<!-- title -->
-<div class="ov" id="ovTitle">
+<div class="ov" id="ovStart">
   <div class="box">
-    <p class="pix c blink">InGARSS 2026 · Hyderabad</p>
-    <h1 class="logo">OSM CHANGE HUNT<small>A SATELLITE TASKING ARCADE</small></h1>
-    <div class="story">
-      <p>It is 02:00 at the constellation ops centre. Your SAR satellite crosses a <b>640 × 640 km</b> sector in a few seconds. Something has changed down there, but you can only image <b>6 tiles</b> of 64.</p>
-      <p>Your only clue is <b>OpenStreetMap</b>: millions of volunteers edit the world map within days of a change. Compare the map before (T₁) and after (T₂) and find the real changes.</p>
-      <p>Your rival is <b style="color:var(--magenta)">AUTO-PRIOR</b>, the algorithm from our paper. It scores every edit by layer weight and fires at the six highest scores. Beat it.</p>
-    </div>
-    <div class="steps">
-      <div><i>1</i><span>Read the <b>DIFF</b>: green = added, red = deleted, blue = modified. Letter tiles are high-value features.</span></div>
-      <div><i>2</i><span>Tap tiles to lock up to 6 targets. Watch the pass bar.</span></div>
-      <div><i>3</i><span><b>FIRE</b>. Hits score 1000, leftover time adds a bonus if you hit anything, out-scoring AUTO-PRIOR adds 1500.</span></div>
-    </div>
-    <button class="start" id="btnStart">Press start</button>
-    <p class="pix mut" id="hiLine">Hi-score 000000</p>
+    <h1 class="logo">OSM CHANGE HUNT</h1>
+    <p>Something changed on the ground. Your satellite can image only <b>6 of 64 tiles</b>.</p>
+    <p>Use the <b>OpenStreetMap edits</b> to choose. Beat <b style="color:var(--magenta)">the AI</b> from our paper.</p>
+    <button class="start" id="btnStart">Start</button>
+    <p class="pix blink">3 missions · 1 minute</p>
   </div>
 </div>
 
-<!-- briefing -->
-<div class="ov" id="ovBrief" hidden>
+<div class="ov" id="ovEnd" hidden>
   <div class="box">
-    <p class="pix c" id="bMission">Mission 1/5</p>
-    <h2 class="logo" style="font-size:clamp(16px,5vw,24px)" id="bSector">SECTOR</h2>
-    <p id="bStory" class="story"></p>
-    <div class="intel"><span class="pix g">Intel</span><span id="bIntel"></span></div>
-    <p class="pix mut" id="bPass">Pass: 45 s · 6 shots</p>
-    <button class="start" id="btnLaunch">Launch</button>
-  </div>
-</div>
-
-<!-- debrief -->
-<div class="ov" id="ovDebrief" hidden>
-  <div class="box">
-    <p class="pix c" id="dTitle">Mission complete</p>
-    <div class="duel">
-      <div class="you"><span class="pix c" style="font-size:9px">You</span><span class="n" id="dYou">0/0</span></div>
-      <div class="ai"><span class="pix m" style="font-size:9px">Auto-prior</span><span class="n" id="dAi">0/0</span></div>
+    <p class="pix">Game over</p>
+    <h2 class="logo" style="font-size:clamp(16px,5vw,24px)" id="eTitle">YOU WIN</h2>
+    <div class="big">
+      <div><span class="l">You found</span><span class="n" id="eYou">0</span></div>
+      <div class="ai"><span class="l">AI found</span><span class="n" id="eAi">0</span></div>
     </div>
-    <div class="tally" id="dTally"></div>
-    <p class="lesson" id="dLesson"></p>
-    <div class="row"><button class="ghost" id="btnView">View map</button><button class="start" id="btnNext">Next mission</button></div>
-  </div>
-</div>
-
-<!-- final -->
-<div class="ov" id="ovFinal" hidden>
-  <div class="box">
-    <p class="pix c">Campaign over</p>
-    <h2 class="logo" style="font-size:clamp(18px,6vw,30px)" id="fScore">000000</h2>
-    <p class="pix g" id="fRank">Rank</p>
-    <div class="duel">
-      <div class="you"><span class="pix c" style="font-size:9px">You found</span><span class="n" id="fYou">0</span></div>
-      <div class="ai"><span class="pix m" style="font-size:9px">Auto-prior found</span><span class="n" id="fAi">0</span></div>
-    </div>
-    <div class="paper">
-      <p class="pix g" style="font-size:9px">On real data (the paper)</p>
-      <div class="nums"><span><b>76.5%</b>recall, 13 of 17 events</span><span><b>8.2%</b>of cells flagged</span><span><b>12.2×</b>fewer cells to review</span></div>
-      <table>
-        <thead><tr><th>Jan 2023 – Jan 2025</th><th>Events</th><th>Recall</th><th>Flagged</th></tr></thead>
-        <tbody>
-          <tr><td>Turkey, earthquake</td><td>6</td><td>100%</td><td>9.1%</td></tr>
-          <tr><td>Nusantara, new capital</td><td>5</td><td>60%</td><td>4.4%</td></tr>
-          <tr><td>Egypt, megaprojects</td><td>6</td><td>66.7%</td><td>7.6%</td></tr>
-        </tbody>
-      </table>
-      <p>Real limits, the same ones you met: military sites often go unmapped or are removed from OSM, and volunteer mapping events create edits where nothing changed.</p>
-    </div>
+    <p class="small">On real maps of Turkey, Indonesia and Egypt, the AI:</p>
+    <div class="nums"><span><b>76.5%</b>of changes found</span><span><b>8.2%</b>of tiles checked</span><span><b>12×</b>less to review</span></div>
     <button class="start" id="btnAgain">Play again</button>
-    <p class="credit">Poster 1571316236 · InGARSS 2026 · Defense and Innovation Lab, GalaxEye Space</p>
   </div>
 </div>
 
-<div class="toast" id="toast" aria-live="assertive"></div>
 <button class="mute" id="btnMute" aria-pressed="false">SOUND ON</button>
 
 <script>
 (() => {
   "use strict";
-  // ---------------------------------------------------------------- model (the paper's method)
-  const LAYERS = { // weights from Table I of the paper (subset)
-    naval: { w: 5, code: "N", name: "Naval base" }, airfield: { w: 4, code: "A", name: "Airfield" },
-    military: { w: 3, code: "M", name: "Military site" }, radar: { w: 3, code: "R", name: "Radar" },
-    logistics: { w: 2, code: "L", name: "Logistics" }, power: { w: 1, code: "P", name: "Power plant" },
-    building: { w: 0.5, code: "", name: "Building" }, road: { w: 0.5, code: "", name: "Road" },
-  };
-  const N = 8, CELLS = 64, SHOTS = 6, MISSIONS = 5;
-  const SECTORS = [
-    { name: "SECTOR KESTREL", pass: 45, story: "A quiet inland sector. Analysts expect routine construction, but a regional airstrip has been rumoured for months.",
-      intel: "No unusual mapping activity reported. The OSM edits here should be honest." },
-    { name: "DELTA BASIN", pass: 42, story: "A river delta with fast-growing towns. A volunteer mapping event ran here last month.",
-      intel: "Heads up: a remote-mapping campaign added many buildings and roads in one area. Lots of edits, not much change." },
-    { name: "RIDGE LINE", pass: 40, story: "Mountain border country. Some sites here are sensitive and rarely appear on public maps.",
-      intel: "Military changes may never reach OSM. If nothing was mapped, no one, human or algorithm, can see it in the diff." },
-    { name: "COASTAL PORT", pass: 38, story: "A busy coastline with naval yards and new logistics hubs. Reconstruction after a storm is under way.",
-      intel: "Expect both real reconstruction and a mapping campaign. Weigh what changed, not just how much." },
-    { name: "CAPITAL WORKS", pass: 35, story: "A new administrative capital rising from scratch. Two volunteer campaigns are mapping it at once.",
-      intel: "Final mission: two mapping campaigns and possibly unmapped sites. Trust the high-value letters." },
+  // The AI is the paper's change prior: score = sum of (layer weight x features changed), weights from Table I
+  const W = { naval: 5, airfield: 4, military: 3, radar: 3, logistics: 2, power: 1, building: 0.5, road: 0.5 };
+  const CODE = { naval: "N", airfield: "A", military: "M", radar: "R", logistics: "L", power: "P" };
+  const N = 8, CELLS = 64, SHOTS = 6, MISSIONS = 3;
+  const HINTS = [
+    "Big letters matter more than lots of dots. <b>Find the 4 real changes.</b>",
+    "Volunteers just mapped one area heavily. <b>Lots of dots ≠ real change.</b>",
+    "Some military sites are never mapped. <b>Even the AI can't see those.</b>",
   ];
   function rng(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a);
     t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 
-  let S, fid = 0, seedBase = Date.now() % 100000;
-  const keep = f => { S.cells[f.c].t1.push(f); S.cells[f.c].t2.push(f); };
-  const add = (c, type) => S.cells[c].t2.push({ id: ++fid, type, st: "add" });
-  function del(c, type, n = 1) { for (let i = 0; i < n; i++) { let f = S.cells[c].t2.find(f => f.type === type && f.st === "same");
-      if (!f) { f = { id: ++fid, c, type, st: "same" }; keep(f); } f.st = "del"; } }
-  function mod(c, type) { let f = S.cells[c].t2.find(f => f.type === type && f.st === "same");
-    if (!f) { f = { id: ++fid, c, type, st: "same" }; keep(f); } f.st = "mod"; }
+  let S, seed = Date.now() % 1e6;
+  const put = (c, type, st) => S.cells[c].push({ type, st });
   const EVENTS = [
-    { label: "New airfield", mil: true, apply: c => { add(c, "airfield"); add(c, "building"); add(c, "building"); } },
-    { label: "Naval base expansion", mil: true, apply: c => { mod(c, "naval"); add(c, "logistics"); } },
-    { label: "New radar site", mil: true, apply: c => { add(c, "radar"); add(c, "military"); } },
-    { label: "Reconstruction district", mil: false, apply: (c, r) => { del(c, "building", 3 + Math.floor(r() * 3));
-        const k = 5 + Math.floor(r() * 5); for (let i = 0; i < k; i++) add(c, "building"); add(c, "road"); add(c, "road"); } },
-    { label: "New power plant", mil: false, apply: c => { add(c, "power"); add(c, "building"); add(c, "building"); add(c, "building"); } },
+    { mil: true, apply: c => { put(c, "airfield", "add"); put(c, "building", "add"); put(c, "building", "add"); } },
+    { mil: true, apply: c => { put(c, "naval", "mod"); put(c, "logistics", "add"); } },
+    { mil: true, apply: c => { put(c, "radar", "add"); put(c, "military", "add"); } },
+    { mil: false, apply: (c, r) => { const k = 5 + Math.floor(r() * 5); for (let i = 0; i < k; i++) put(c, "building", "add");
+        for (let i = 0; i < 3; i++) put(c, "building", "del"); put(c, "road", "add"); } },
+    { mil: false, apply: c => { put(c, "power", "add"); put(c, "building", "add"); put(c, "building", "add"); } },
   ];
-
   function makeMission(n) {
-    const r = rng(seedBase + n * 7919);
-    S = { n, cells: Array.from({ length: CELLS }, () => ({ t1: [], t2: [] })), events: [], sel: new Set(), done: false, camps: [],
-          shade: Array.from({ length: CELLS }, () => Math.floor(r() * 3)) };
-    for (let c = 0; c < CELLS; c++) {
-      const nb = Math.floor(r() * 4), nr = Math.floor(r() * 2);
-      for (let i = 0; i < nb; i++) keep({ id: ++fid, c, type: "building", st: "same" });
-      for (let i = 0; i < nr; i++) keep({ id: ++fid, c, type: "road", st: "same" });
-      if (r() < 0.06) keep({ id: ++fid, c, type: ["naval", "military", "logistics", "power"][Math.floor(r() * 4)], st: "same" });
+    const r = rng(seed + n * 7919);
+    S = { n, cells: Array.from({ length: CELLS }, () => []), real: new Set(), sel: new Set(), done: false };
+    const used = new Set();
+    for (let k = 0; k < 4; k++) {
+      let c; do { c = Math.floor(r() * CELLS); } while (used.has(c)); used.add(c); S.real.add(c);
+      // mission 3: the first change is always a military site that never reached OSM (no edits at all)
+      const ev = n === 3 && k === 0 ? EVENTS[Math.floor(r() * 3)] : EVENTS[Math.floor(r() * EVENTS.length)];
+      if (!(n === 3 && k === 0)) ev.apply(c, r);
     }
-    const used = new Set(), nEv = 4 + (n > 2 ? 1 : 0);
-    for (let k = 0; k < nEv; k++) {
-      let c; do { c = Math.floor(r() * CELLS); } while (used.has(c)); used.add(c);
-      const ev = EVENTS[Math.floor(r() * EVENTS.length)];
-      const unmapped = n >= 3 && ev.mil && r() < 0.45;   // sec. V of the paper: unmapped / suppressed sites
-      if (!unmapped) ev.apply(c, r);
-      S.events.push({ cell: c, label: ev.label, unmapped });
-    }
-    const nCamp = n >= 5 ? 2 : (n === 2 || n === 4) ? 1 : 0;   // remote-mapping campaigns: false positives
-    for (let k = 0; k < nCamp; k++) {
-      const r0 = Math.floor(r() * (N - 1)), c0 = Math.floor(r() * (N - 2)), block = [];
+    if (n >= 2) {                                                       // mission 2+: a volunteer mapping campaign
+      const r0 = Math.floor(r() * (N - 1)), c0 = Math.floor(r() * (N - 2));
       for (let dr = 0; dr < 2; dr++) for (let dc = 0; dc < 3; dc++) {
-        const c = (r0 + dr) * N + c0 + dc; if (used.has(c)) continue; block.push(c);
-        const kb = 4 + Math.floor(r() * 7); for (let i = 0; i < kb; i++) add(c, "building"); if (r() < 0.7) add(c, "road");
+        const c = (r0 + dr) * N + c0 + dc; if (used.has(c)) continue;
+        const k = 7 + Math.floor(r() * 6); for (let i = 0; i < k; i++) put(c, "building", "add"); put(c, "road", "add");
       }
-      S.camps.push(block);
     }
-    for (let c = 0; c < CELLS; c++) if (!used.has(c) && r() < 0.25) add(c, r() < 0.6 ? "building" : "road");
-    // s(c) = sum_l w_l |Delta_l(c)|; a modified feature counts as delete + re-add
-    S.score = S.cells.map(cell => cell.t2.reduce((s, f) => s + (f.st === "add" || f.st === "del" ? 1 : f.st === "mod" ? 2 : 0) * LAYERS[f.type].w, 0));
-    const mx = Math.max(...S.score, 1); S.norm = S.score.map(v => v / mx);
+    for (let c = 0; c < CELLS; c++) if (!used.has(c) && r() < 0.25) put(c, r() < 0.6 ? "building" : "road", "add");
+    S.score = S.cells.map(fs => fs.reduce((s, f) => s + (f.st === "mod" ? 2 : 1) * W[f.type], 0));
     S.ai = new Set([...S.score.keys()].filter(c => S.score[c] > 0).sort((a, b) => S.score[b] - S.score[a] || a - b).slice(0, SHOTS));
   }
 
-  // ---------------------------------------------------------------- sound (WebAudio, starts after a tap)
-  let actx = null, muted = false;
+  // sound
+  let ac = null, muted = false;
   try { muted = localStorage.getItem("och-mute") === "1"; } catch (e) {}
   function tone(f, d = 0.08, type = "square", vol = 0.05, slide = 0) {
     if (muted) return;
-    try {
-      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
-      const o = actx.createOscillator(), g = actx.createGain(), t = actx.currentTime;
+    try { ac = ac || new (window.AudioContext || window.webkitAudioContext)(); const o = ac.createOscillator(), g = ac.createGain(), t = ac.currentTime;
       o.type = type; o.frequency.setValueAtTime(f, t); if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(40, f + slide), t + d);
-      g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
-      o.connect(g).connect(actx.destination); o.start(t); o.stop(t + d + 0.02);
+      g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + d); o.connect(g).connect(ac.destination); o.start(t); o.stop(t + d + 0.02);
     } catch (e) {}
   }
-  const sfx = {
-    lock: () => tone(880, 0.06), unlock: () => tone(440, 0.06),
-    fire: () => { tone(1200, 0.35, "sawtooth", 0.04, -1000); },
-    hit: () => { tone(660, 0.08); setTimeout(() => tone(990, 0.12), 80); },
-    miss: () => tone(160, 0.18, "triangle", 0.06, -60),
-    start: () => [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => tone(f, 0.1), i * 90)),
-    tick: () => tone(1500, 0.03, "square", 0.025),
-  };
+  const sfx = { lock: () => tone(880, 0.06), unlock: () => tone(440, 0.06), fire: () => tone(1200, 0.35, "sawtooth", 0.04, -1000),
+    hit: () => { tone(660, 0.08); setTimeout(() => tone(990, 0.12), 80); }, miss: () => tone(160, 0.18, "triangle", 0.06, -60),
+    start: () => [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => tone(f, 0.1), i * 90)) };
 
-  // ---------------------------------------------------------------- state & UI
+  // UI
   const $ = id => document.getElementById(id);
-  let view = "D", heatOn = false, total = 0, youHits = 0, aiHits = 0, evTotal = 0, hi = 0;
-  let timer = null, t0 = 0, passLen = 45, lastTick = -1;
   const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  try { hi = +localStorage.getItem("och-hi") || 0; } catch (e) {}
-  const pad = v => String(Math.max(0, Math.round(v))).padStart(6, "0");
-
+  let you = 0, ai = 0;
   const cellsEl = [];
   for (let c = 0; c < CELLS; c++) {
     const d = document.createElement("div");
     d.className = "cell"; d.tabIndex = 0; d.setAttribute("role", "gridcell");
     d.addEventListener("click", () => toggle(c));
-    d.addEventListener("keydown", e => {
-      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(c); }
+    d.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(c); }
       const mv = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: N, ArrowUp: -N }[e.key];
-      if (mv !== undefined) { e.preventDefault(); const t = c + mv; if (t >= 0 && t < CELLS) cellsEl[t].focus(); }
-    });
+      if (mv !== undefined) { e.preventDefault(); const t = c + mv; if (t >= 0 && t < CELLS) cellsEl[t].focus(); } });
     $("grid").appendChild(d); cellsEl.push(d);
   }
-  const shotSVG = '<svg viewBox="0 0 40 40"><rect x="15" y="14" width="10" height="12" rx="2" fill="#e9edff"/><rect x="2" y="16" width="11" height="8" fill="#3ee8ff"/><rect x="27" y="16" width="11" height="8" fill="#3ee8ff"/></svg>';
-
-  function ramp(v) { const k = ["--ramp1", "--ramp2", "--ramp3", "--ramp4"]; const cs = getComputedStyle(document.documentElement);
-    return v <= 0 ? "transparent" : cs.getPropertyValue(k[Math.min(3, Math.floor(v * 3.999))]).trim(); }
-
-  function feats(list) {
-    const out = []; let dots = 0;
-    for (const f of list) {
-      let cls = "";
-      if (view === "D") { if (f.st === "same") continue; cls = f.st; }
-      else if (view === "T1" && f.st === "add") continue;
-      else if (view === "T2" && f.st === "del") continue;
-      const L = LAYERS[f.type];
-      const sign = view === "D" ? (f.st === "add" ? "+" : f.st === "del" ? "−" : "~") : "";
-      if (L.code) out.push(`<span class="b ${cls}" title="${L.name}">${sign}${L.code}</span>`);
-      else if (dots < 9) { out.push(`<span class="dot ${cls}" title="${L.name}"></span>`); dots++; }
-    }
-    return out.join("");
-  }
-
   function render() {
-    $("score").textContent = pad(total); $("hi").textContent = pad(Math.max(hi, total));
-    $("mission").textContent = `${S.n}/${MISSIONS}`; $("youHits").textContent = youHits; $("aiHits").textContent = aiHits;
-    $("sector").textContent = SECTORS[S.n - 1].name;
+    $("you").textContent = you; $("ai").textContent = ai; $("mis").textContent = S.n;
     for (let c = 0; c < CELLS; c++) {
-      const el = cellsEl[c], cell = S.cells[c];
-      let h = "";
-      if (S.done && heatOn) h += `<span class="heat" style="background:${ramp(S.norm[c])}"></span>`;
-      h += feats(view === "T1" ? cell.t1 : cell.t2);
-      if (S.done) {
-        const ev = S.events.find(e => e.cell === c);
-        if (ev && S.revealed) h += `<span class="mk ${S.sel.has(c) ? "hit" : "miss"}">${S.sel.has(c) ? "★" : "✕"}</span>`;
-        if (heatOn && S.score[c] > 0) h += `<span class="sc">${S.score[c].toFixed(1)}</span>`;
+      let h = "", dots = 0;
+      for (const f of S.cells[c]) {
+        const sign = f.st === "add" ? "+" : f.st === "del" ? "−" : "~";
+        if (CODE[f.type]) h += `<span class="b ${f.st}">${sign}${CODE[f.type]}</span>`;
+        else if (dots++ < 8) h += `<span class="dot ${f.st}"></span>`;
       }
+      if (S.done && S.real.has(c)) h += `<span class="mk ${S.sel.has(c) ? "hit" : "miss"}">${S.sel.has(c) ? "★" : "✕"}</span>`;
+      const el = cellsEl[c];
       el.innerHTML = h;
-      el.className = "cell" + (S.shade[c] === 1 ? " t2" : S.shade[c] === 2 ? " t3" : "") + (S.sel.has(c) ? " sel" : "") + (S.done && S.aiShown && S.ai.has(c) ? " ai" : "");
-      const rr = Math.floor(c / N) + 1, cc = c % N + 1;
-      el.setAttribute("aria-label", `Tile row ${rr}, column ${cc}${S.sel.has(c) ? ", locked" : ""}`);
+      el.className = "cell" + ((c + Math.floor(c / N)) % 2 ? " alt" : "") + (S.sel.has(c) ? " sel" : "") + (S.done && S.ai.has(c) ? " ai" : "");
+      el.setAttribute("aria-label", `Tile ${Math.floor(c / N) + 1}-${c % N + 1}${S.sel.has(c) ? ", selected" : ""}`);
     }
-    $("shots").innerHTML = Array.from({ length: SHOTS }, (_, i) => `<span class="shot ${i < S.sel.size ? "spent" : ""}">${shotSVG}</span>`).join("");
-    const f = $("fire"); f.hidden = S.done; f.disabled = S.sel.size === 0;
-    f.textContent = S.sel.size === SHOTS ? "FIRE!" : `Fire ${S.sel.size}/${SHOTS}`;
-    for (const [id, v] of [["vT1", "T1"], ["vT2", "T2"], ["vD", "D"]]) $(id).setAttribute("aria-pressed", String(view === v));
+    const go = $("go");
+    if (S.done) { go.disabled = false; go.className = "go next"; go.textContent = S.n < MISSIONS ? "Next mission" : "See results"; }
+    else { go.className = "go"; go.disabled = S.sel.size < SHOTS; go.textContent = S.sel.size < SHOTS ? `Pick ${SHOTS - S.sel.size} more` : "Fire!"; }
   }
-
   function toggle(c) {
-    if (S.done || !timer) return;
-    if (S.sel.has(c)) { S.sel.delete(c); sfx.unlock(); }
-    else if (S.sel.size < SHOTS) { S.sel.add(c); sfx.lock(); }
-    render();
-  }
-
-  function toast(t) { const el = $("toast"); el.textContent = t; el.classList.remove("show"); void el.offsetWidth; el.classList.add("show"); }
-
-  // satellite pass: sprite moves along a diagonal ground track over the map while the timer runs
-  function layoutTrack() {
-    const w = $("mapwrap").clientWidth, h = $("mapwrap").clientHeight;
-    $("track").setAttribute("viewBox", `0 0 ${w} ${h}`);
-    $("track").innerHTML = `<line x1="${w * 0.08}" y1="-10" x2="${w * 0.92}" y2="${h + 10}" stroke="rgba(62,232,255,0.35)" stroke-width="2" stroke-dasharray="6 6"/>`;
-  }
-  function placeSat(p) {
-    const w = $("mapwrap").clientWidth, h = $("mapwrap").clientHeight;
-    const x = w * (0.08 + 0.84 * p) - 17, y = -10 + (h + 20) * p - 17;
-    $("sat").style.transform = `translate(${x}px, ${y}px)`;
-  }
-  function frame() {
-    if (!timer) return;
-    const left = Math.max(0, passLen - (performance.now() - t0) / 1000), p = 1 - left / passLen;
-    $("passBar").style.transform = `scaleX(${left / passLen})`;
-    $("pass").classList.toggle("low", left < 8);
-    if (!reduce) placeSat(p);
-    const s = Math.ceil(left); if (left < 8 && s !== lastTick) { lastTick = s; sfx.tick(); }
-    if (left <= 0) { if (S.sel.size) fire(true); else { timer = null; toast("PASS MISSED"); fire(true); } return; }
-    timer = requestAnimationFrame(frame);
-  }
-
-  function fire(timeout = false) {
     if (S.done) return;
-    const left = Math.max(0, passLen - (performance.now() - t0) / 1000);
-    cancelAnimationFrame(timer); timer = null;
-    S.done = true; S.revealed = false; S.aiShown = false; view = "D"; heatOn = false;
-    sfx.fire(); render();
-    const order = [...S.sel];
-    order.forEach((c, i) => setTimeout(() => {
-      cellsEl[c].classList.remove("scan"); void cellsEl[c].offsetWidth; cellsEl[c].classList.add("scan");
-      S.events.some(e => e.cell === c) ? sfx.hit() : sfx.miss();
-    }, (reduce ? 0 : 280) * i));
-    setTimeout(() => {
-      S.revealed = true; render();
-      setTimeout(() => { S.aiShown = true; render(); debrief(timeout ? 0 : left); }, reduce ? 0 : 700);
-    }, (reduce ? 0 : 280) * order.length + 200);
-  }
-
-  function debrief(left) {
-    const you = S.events.filter(e => S.sel.has(e.cell)).length, ai = S.events.filter(e => S.ai.has(e.cell)).length;
-    youHits += you; aiHits += ai; evTotal += S.events.length;
-    const pts = you * 1000, bonus = you > 0 ? Math.round(left) * 20 : 0, duel = you > ai ? 1500 : you === ai && you > 0 ? 500 : 0;
-    total += pts + bonus + duel;
-    if (total > hi) { hi = total; try { localStorage.setItem("och-hi", String(hi)); } catch (e) {} }
-    toast(you > ai ? "YOU BEAT AUTO-PRIOR!" : you === ai ? "DRAW" : "AUTO-PRIOR WINS");
-    $("dTitle").textContent = `Mission ${S.n}/${MISSIONS} · ${SECTORS[S.n - 1].name}`;
-    $("dYou").textContent = `${you}/${S.events.length}`; $("dAi").textContent = `${ai}/${S.events.length}`;
-    $("dTally").innerHTML = [
-      [`Hits × 1000`, pts], [you > 0 ? `Time bonus (${Math.round(left)} s × 20)` : "Time bonus (needs a hit)", bonus],
-      [you > ai ? "Beat AUTO-PRIOR" : you === ai && you > 0 ? "Matched AUTO-PRIOR" : "Duel bonus", duel],
-      ...S.events.map(e => [`${e.label}${e.unmapped ? " (never mapped)" : ""} · you ${S.sel.has(e.cell) ? "✓" : "✗"} · AI ${S.ai.has(e.cell) ? "✓" : "✗"}`, null]),
-    ].map(([k, v]) => `<div><span>${k}</span>${v === null ? "" : `<b>+${v}</b>`}</div>`).join("");
-    const L = [];
-    const campHits = S.camps.flat().filter(c => S.ai.has(c)).length;
-    if (S.events.some(e => e.unmapped)) L.push("A site that never reached OSM leaves no edit to find. The paper names this limit: sensitive sites go unmapped exactly where interest is highest.");
-    if (campHits) L.push(`A mapping campaign lured ${campHits} of AUTO-PRIOR's shots onto tiles where nothing changed. Many buildings at weight 0.5 still add up.`);
-    if (!L.length) L.push("One new airfield (weight 4) outranks several new buildings (0.5 each). That is why the prior weights defence-relevant layers higher.");
-    $("dLesson").textContent = L.join(" ");
-    $("btnNext").textContent = S.n < MISSIONS ? "Next mission" : "Results";
+    if (S.sel.has(c)) { S.sel.delete(c); sfx.unlock(); } else if (S.sel.size < SHOTS) { S.sel.add(c); sfx.lock(); }
     render();
-    setTimeout(() => { $("ovDebrief").hidden = false; $("btnNext").focus(); }, reduce ? 0 : 900);
   }
-
-  function brief(n) {
-    makeMission(n); view = "D"; heatOn = false; render(); layoutTrack(); placeSat(0);
-    $("passBar").style.transform = "scaleX(1)"; $("pass").classList.remove("low");
-    const s = SECTORS[n - 1];
-    $("bMission").textContent = `Mission ${n}/${MISSIONS}`; $("bSector").textContent = s.name;
-    $("bStory").textContent = s.story; $("bIntel").textContent = s.intel;
-    $("bPass").textContent = `Pass: ${s.pass} s · ${SHOTS} shots · ${S.events.length} real changes hidden`;
-    $("ovBrief").hidden = false; $("btnLaunch").focus();
+  function fire() {
+    S.done = true; sfx.fire();
+    [...S.sel].forEach((c, i) => setTimeout(() => { cellsEl[c].classList.add("scan"); S.real.has(c) ? sfx.hit() : sfx.miss(); }, (reduce ? 0 : 220) * i));
+    const y = [...S.real].filter(c => S.sel.has(c)).length, a = [...S.real].filter(c => S.ai.has(c)).length;
+    you += y; ai += a;
+    setTimeout(() => {
+      render();
+      $("hint").innerHTML = `★ your hits · ✕ changes you missed · <span style="color:var(--magenta)">pink</span> = the AI's picks.<br><b>You ${y}/4 · AI ${a}/4</b>`;
+    }, (reduce ? 0 : 220) * SHOTS + 150);
   }
-  function launch() {
-    $("ovBrief").hidden = true; passLen = SECTORS[S.n - 1].pass; lastTick = -1;
-    sfx.start(); toast(`MISSION ${S.n}`);
-    t0 = performance.now(); timer = requestAnimationFrame(frame);
-    $("tip").textContent = "Tap up to 6 tiles to lock targets, then FIRE before the pass ends.";
-  }
-  function finish() {
-    $("ovDebrief").hidden = true;
-    $("fScore").textContent = pad(total); $("fYou").textContent = `${youHits}/${evTotal}`; $("fAi").textContent = `${aiHits}/${evTotal}`;
-    const ranks = [[0, "Night-shift trainee"], [5000, "Junior imagery analyst"], [11000, "Senior tasking officer"], [17000, "Constellation commander"], [23000, "Legend of the ground track"]];
-    $("fRank").textContent = "Rank: " + ranks.filter(r => total >= r[0]).pop()[1];
-    $("ovFinal").hidden = false; $("btnAgain").focus();
-  }
-  function newGame() {
-    total = 0; youHits = 0; aiHits = 0; evTotal = 0; seedBase = (Date.now() + Math.floor(Math.random() * 1e5)) % 1e6;
-    ["ovTitle", "ovFinal", "ovDebrief"].forEach(id => $(id).hidden = true); brief(1);
-  }
-
-  $("btnStart").addEventListener("click", () => { sfx.start(); newGame(); });
-  $("btnLaunch").addEventListener("click", launch);
-  $("fire").addEventListener("click", () => fire(false));
-  $("btnNext").addEventListener("click", () => { $("ovDebrief").hidden = true; S.n < MISSIONS ? brief(S.n + 1) : finish(); });
-  $("btnView").addEventListener("click", () => { $("ovDebrief").hidden = true; heatOn = true; render();
-    $("tip").innerHTML = 'Heat = AUTO-PRIOR\'s score s(c). Pink dashes = its shots. ★ = your hit, ✕ = a change you missed. <button class="ghost" id="btnBack" style="margin-top:6px">Back to debrief</button>';
-    $("btnBack").addEventListener("click", () => { $("ovDebrief").hidden = false; }); });
+  function startMission(n) { makeMission(n); $("hint").innerHTML = HINTS[n - 1]; render(); }
+  $("go").addEventListener("click", () => {
+    if (!S.done) return fire();
+    if (S.n < MISSIONS) return startMission(S.n + 1);
+    $("eYou").textContent = `${you}/12`; $("eAi").textContent = `${ai}/12`;
+    $("eTitle").textContent = you > ai ? "YOU WIN!" : you === ai ? "DRAW" : "AI WINS";
+    $("ovEnd").hidden = false; $("btnAgain").focus();
+  });
+  function newGame() { you = 0; ai = 0; seed = (Date.now() + Math.floor(Math.random() * 1e5)) % 1e6;
+    $("ovStart").hidden = true; $("ovEnd").hidden = true; sfx.start(); startMission(1); }
+  $("btnStart").addEventListener("click", newGame);
   $("btnAgain").addEventListener("click", newGame);
-  for (const [id, v] of [["vT1", "T1"], ["vT2", "T2"], ["vD", "D"]]) $(id).addEventListener("click", () => { view = v; render(); });
   $("btnMute").addEventListener("click", () => { muted = !muted; try { localStorage.setItem("och-mute", muted ? "1" : "0"); } catch (e) {}
     $("btnMute").textContent = muted ? "SOUND OFF" : "SOUND ON"; $("btnMute").setAttribute("aria-pressed", String(muted)); });
   $("btnMute").textContent = muted ? "SOUND OFF" : "SOUND ON";
-  addEventListener("resize", () => { layoutTrack(); if (!timer) placeSat(S && S.done ? 1 : 0); });
 
   // starfield
   const cv = $("stars"), cx = cv.getContext("2d"); let stars = [];
-  function sizeStars() { cv.width = innerWidth * devicePixelRatio; cv.height = innerHeight * devicePixelRatio;
-    stars = Array.from({ length: 110 }, () => ({ x: Math.random() * cv.width, y: Math.random() * cv.height, z: 0.3 + Math.random() * 1.2 })); }
-  function drawStars() {
-    cx.clearRect(0, 0, cv.width, cv.height);
+  function size() { cv.width = innerWidth * devicePixelRatio; cv.height = innerHeight * devicePixelRatio;
+    stars = Array.from({ length: 90 }, () => ({ x: Math.random() * cv.width, y: Math.random() * cv.height, z: 0.3 + Math.random() * 1.2 })); }
+  function draw() { cx.clearRect(0, 0, cv.width, cv.height);
     for (const s of stars) { if (!reduce) { s.y += s.z * 0.35 * devicePixelRatio; if (s.y > cv.height) { s.y = 0; s.x = Math.random() * cv.width; } }
       cx.fillStyle = `rgba(200,215,255,${0.25 + s.z * 0.4})`; cx.fillRect(s.x, s.y, s.z * devicePixelRatio * 1.4, s.z * devicePixelRatio * 1.4); }
-    if (!reduce) requestAnimationFrame(drawStars);
-  }
-  addEventListener("resize", sizeStars); sizeStars(); drawStars();
+    if (!reduce) requestAnimationFrame(draw); }
+  addEventListener("resize", size); size(); draw();
 
-  // idle map behind the title screen
-  makeMission(1); render(); layoutTrack(); placeSat(0.15);
-  $("hiLine").textContent = `Hi-score ${pad(hi)}`;
+  startMission(1);
   $("btnStart").focus();
 })();
 </script>
